@@ -1,6 +1,6 @@
 import {db} from '../lib/db.js';
 import {fail,method,noCache,requireAdmin,jsonBody,sameOrigin,httpError} from '../lib/http.js';
-import {envClean,intClean,startClean,nameClean,idClean} from '../lib/validation.js';
+import {envClean,intClean,startClean,nameClean,idClean,enoughGap,MIN_START_GAP_MS,GAP_MESSAGE} from '../lib/validation.js';
 const uniqueSlot=e=>{if(e?.code==='23505')throw httpError('Ban này đã có ca vào giờ đó');throw e;};
 async function audit(tx,action,details){await tx`INSERT INTO admin_audit(action,details) VALUES(${action},${JSON.stringify(details)}::jsonb)`;}
 export default async function handler(req,res){
@@ -63,13 +63,13 @@ export default async function handler(req,res){
         const [count]=await tx`SELECT COUNT(*)::int AS n FROM registrations WHERE slot_id=${id}`;
         if(count.n>capacity)throw httpError('Sức chứa thấp hơn số sinh viên đã đăng ký');
         if(start){
-          // Moving a slot must not leave any of its students with two slots under 15 minutes apart.
+          // Moving a slot must not leave any of its students without the 15-minute break between sessions.
           const clash=await tx`
             SELECT 1 FROM registrations r
             JOIN registrations o ON o.env=r.env AND o.student_id=r.student_id AND o.id<>r.id
             JOIN slots s ON s.id=o.slot_id
-            WHERE r.slot_id=${id} AND abs(extract(epoch FROM s.start_at-${start}::timestamptz))<900 LIMIT 1`;
-          if(clash.length)throw httpError('Giờ mới khiến sinh viên trong ca có hai ca cách nhau dưới 15 phút');
+            WHERE r.slot_id=${id} AND abs(extract(epoch FROM s.start_at-${start}::timestamptz))<${MIN_START_GAP_MS/1000} LIMIT 1`;
+          if(clash.length)throw httpError('Giờ mới khiến một sinh viên trong ca không còn đủ 15 phút nghỉ giữa hai ca.');
         }
         await tx`UPDATE slots SET capacity=${capacity},open=${open},start_at=COALESCE(${start}::timestamptz,start_at) WHERE id=${id}`;
         await audit(tx,action,{id,capacity,open,start});
@@ -135,8 +135,8 @@ export default async function handler(req,res){
         const conflicts=await tx`
           SELECT s.start_at FROM registrations r JOIN slots s ON s.id=r.slot_id
           WHERE r.env=${old.env} AND r.student_id=${old.student_id} AND r.id<>${id}`;
-        if(conflicts.some(x=>Math.abs(new Date(x.start_at)-new Date(target.start_at))<15*60*1000))
-          throw httpError('Ca đích cách ca khác của sinh viên dưới 15 phút');
+        if(conflicts.some(x=>!enoughGap(x.start_at,target.start_at)))
+          throw httpError('Ca đích: '+GAP_MESSAGE);
         // Keep original lookup_hash to preserve student's device confirmation link.
         await tx`UPDATE registrations SET slot_id=${newSlot} WHERE id=${id}`;
         await audit(tx,action,{registration_id:id,to_slot:newSlot});

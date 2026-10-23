@@ -12,9 +12,16 @@ test('student validation',()=>{
  assert.throws(()=>envClean('production'));
  assert.equal(intClean('6',1,6),6);
 });
-test('slot 15 minute separation',()=>{
- assert.equal(enoughGap('2026-10-27T08:00:00+07:00','2026-10-27T08:14:00+07:00'),false);
- assert.equal(enoughGap('2026-10-27T08:00:00+07:00','2026-10-27T08:15:00+07:00'),true);
+test('15 minute break between sessions',()=>{
+ // 14:00-14:15 then 14:15-14:30: no break
+ assert.equal(enoughGap('2026-10-27T14:00:00+07:00','2026-10-27T14:15:00+07:00'),false);
+ assert.equal(enoughGap('2026-10-27T14:00:00+07:00','2026-10-27T14:29:00+07:00'),false);
+ // 14:00-14:15 then 14:30-14:45: 15 minute break
+ assert.equal(enoughGap('2026-10-27T14:00:00+07:00','2026-10-27T14:30:00+07:00'),true);
+ // registration order does not matter
+ assert.equal(enoughGap('2026-10-27T14:15:00+07:00','2026-10-27T14:00:00+07:00'),false);
+ assert.equal(enoughGap('2026-10-27T14:30:00+07:00','2026-10-27T14:00:00+07:00'),true);
+ assert.equal(enoughGap('2026-10-27T14:00:00+07:00','2026-10-27T14:00:00+07:00'),false);
 });
 test('timezone and CSV output',()=>{
  assert.equal(startClean('2026-10-27T08:00:00+07:00'),'2026-10-27T01:00:00.000Z');

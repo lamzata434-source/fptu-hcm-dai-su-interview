@@ -27,7 +27,7 @@ export default async function handler(req,res){
       for(const s of chosen){
         // All-or-nothing: any failing slot rolls back the whole submission.
         try{registrations.push(await createRegistration(tx,{...body,student_id:sid,slot_id:s.id},env));}
-        catch(e){e.message=`${s.name} (${slotLabel(s.start_at)}): ${e.message}`;throw e;}
+        catch(e){if(!e.gap)e.message=`${s.name} (${slotLabel(s.start_at)}): ${e.message}`;throw e;}
       }
       await tx`INSERT INTO registration_locks(env,student_id) VALUES(${env},${sid})`;
       return registrations;
