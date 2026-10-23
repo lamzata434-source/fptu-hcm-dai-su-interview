@@ -88,7 +88,14 @@ $('slots').addEventListener('click', e => {
     feedback('', ''); render();
 });
 $('selected-slot').addEventListener('click', e => { const b = e.target.closest('[data-unpick]'); if (!b) return; picks.delete(Number(b.dataset.unpick)); render(); });
-async function refresh() { try { state = await api('public'); prunePicks(); render(); } catch (e) { setNotice(e.message, 'error'); } }
+async function refresh() {
+    try {
+        state = await api('public');
+        // slots.id is a Postgres bigint, which arrives as a string; picks and lookups use numbers.
+        state.slots = state.slots.map(s => ({ ...s, id: Number(s.id), committee_id: Number(s.committee_id) }));
+        prunePicks(); render();
+    } catch (e) { setNotice(e.message, 'error'); }
+}
 $('refresh').addEventListener('click', refresh);
 $('registration-form').addEventListener('submit', async e => {
     e.preventDefault(); if (blocked) return;
