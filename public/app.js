@@ -56,7 +56,7 @@ function selectedText() {
     const chosen = pickedSlots();
     $('selected-slot').innerHTML = chosen.length
         ? `<ul class="sel-list">${chosen.map(s => `<li${lastPicked.has(s.id) ? '' : ' class="new"'}><div><div class="sel-committee">${esc(committeeName(s.committee_id))}</div><div class="sel-date">${esc(dateFmt(s.start_at))}</div></div><span class="sel-time">${esc(timeFmt(s.start_at))}</span><button type="button" class="sel-remove" data-unpick="${s.committee_id}" aria-label="Bỏ chọn ${esc(committeeName(s.committee_id))}">×</button></li>`).join('')}</ul>`
-        : 'Chưa chọn ca. Chọn một ca còn chỗ ở mỗi ban bạn muốn ứng tuyển (bước 1).';
+        : 'Chưa chọn ca. Chọn một ca còn chỗ ở mỗi ban bạn muốn ứng tuyển (bước 2).';
     lastPicked = new Set(chosen.map(s => s.id));
     $('summary').classList.toggle('filled', chosen.length > 0);
     if (chosen.length) $('summary').classList.remove('missing');
@@ -124,7 +124,7 @@ $('refresh').addEventListener('click', refresh);
 $('registration-form').addEventListener('submit', async e => {
     e.preventDefault(); if (blocked) return;
     if (!pickedSlots().length) {
-        feedback('Bạn chưa chọn ca phỏng vấn. Hãy chọn ít nhất một ca còn chỗ ở bước 1 trước khi gửi đăng ký.');
+        feedback('Bạn chưa chọn ca phỏng vấn. Hãy chọn ít nhất một ca còn chỗ ở bước 2 trước khi gửi đăng ký.');
         replay($('summary'), 'missing');
         $('booking').scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
