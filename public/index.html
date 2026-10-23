@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<header class="topbar"><div class="container topbar-inner">
+<header id="topbar" class="topbar"><div class="container topbar-inner">
   <a class="brand" href="/"><img class="brand-img" src="/logo-fpt.jpg" alt="Trường Đại học FPT"><span class="brandsub">TP. HỒ CHÍ MINH</span></a>
   <a class="toplink" href="/admin">Quản trị <span aria-hidden="true">↗</span></a>
 </div></header>
@@ -31,11 +31,12 @@
   <div id="booking" class="layout">
     <section class="panel main-panel">
       <header class="panel-header">
-        <div class="panel-title"><span class="step-num" aria-hidden="true">1</span><div><h2>Chọn ban và ca phỏng vấn</h2><p>Mỗi ban chọn tối đa một ca; có thể chọn nhiều ban. Các ca phải cách nhau ít nhất 15 phút.</p></div></div>
+        <div class="panel-title"><span class="step-num" aria-hidden="true">1</span><div><h2>Chọn ban và ca phỏng vấn</h2><p>Mỗi ban chọn tối đa một ca; có thể chọn nhiều ban. Giữa hai ca cần nghỉ ít nhất 15 phút (ví dụ 14:00 và 14:30).</p></div></div>
         <button id="refresh" class="btn ghost small" type="button">↻ Cập nhật</button>
       </header>
       <div id="committee-tabs" class="tabs" role="tablist" aria-label="Chọn ban"></div>
       <div class="panel-body">
+        <p id="slot-alert" class="feedback error slot-alert" role="alert"></p>
         <div id="slots" class="slots" aria-live="polite"><div class="skeleton" aria-label="Đang tải lịch phỏng vấn"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
         <p id="refresh-info" class="sync">Tự cập nhật mỗi 15 giây</p>
       </div>

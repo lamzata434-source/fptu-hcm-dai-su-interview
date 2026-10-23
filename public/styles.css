@@ -106,7 +106,11 @@ button:disabled{cursor:not-allowed}
 .slot:disabled .slot-time{color:var(--faint)}
 .slot:disabled .seats{visibility:hidden}
 .slot.full .slot-meta{color:var(--bad)}
+.slot.clash,.slot.clash:hover:not(:disabled){background:#fffaf0;border-style:dashed;border-color:#f3d9a8;transform:none;box-shadow:none;cursor:not-allowed}
 .slot.clash .slot-meta{color:#b45309}
+.slot.clash .slot-time{color:var(--faint)}
+.slot.clash .seats{visibility:hidden}
+.slot-alert{margin:0 0 14px}
 .skeleton span{height:92px;border-radius:12px;background:linear-gradient(90deg,#f0f2f5 25%,#e6e9ee 50%,#f0f2f5 75%);background-size:200% 100%;animation:shimmer 1.2s infinite linear}
 @keyframes shimmer{to{background-position:-200% 0}}
 .sync{display:flex;align-items:center;gap:8px;margin:18px 0 0;font-size:12px;color:var(--faint)}
@@ -264,4 +268,94 @@ code{font-size:12px;background:#f2f4f7;padding:2px 6px;border-radius:6px}
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{transition:none!important;animation:none!important}
+}
+
+/* Motion. Entrance animations use backwards fill so hover transforms still work after they finish. */
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}}
+@keyframes settle{from{transform:scale(1.08)}to{transform:scale(1)}}
+@keyframes pop{0%{transform:scale(.95)}55%{transform:scale(1.04)}100%{transform:scale(1)}}
+@keyframes check-in{from{opacity:0;transform:scale(0) rotate(-90deg)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,255,255,.7)}100%{box-shadow:0 0 0 9px rgba(255,255,255,0)}}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.15)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+@keyframes shine{from{left:-60%}to{left:130%}}
+@keyframes slide-up{from{opacity:0;transform:translateY(120%)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes confetti-fall{from{transform:translate(0,0) rotate(0)}to{transform:translate(var(--dx),105vh) rotate(var(--r))}}
+
+.topbar{transition:box-shadow .25s}
+.topbar.scrolled{box-shadow:0 8px 24px -16px rgba(16,24,40,.35)}
+
+.hero{animation:rise .7s cubic-bezier(.2,.7,.2,1) backwards}
+.hero-photo::before{content:"";position:absolute;width:340px;height:340px;left:-90px;bottom:-150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.28),transparent 70%);animation:drift 10s ease-in-out infinite;pointer-events:none}
+.hero-text{position:relative;z-index:1}
+.hero-text>*{animation:rise .6s cubic-bezier(.2,.7,.2,1) backwards}
+.hero-text>:nth-child(1){animation-delay:.15s}
+.hero-text>:nth-child(2){animation-delay:.23s}
+.hero-text>:nth-child(3){animation-delay:.31s}
+.hero-text>:nth-child(4){animation-delay:.39s}
+.hero-text>:nth-child(5){animation-delay:.47s}
+.hero-img{animation:settle 1.8s cubic-bezier(.2,.7,.2,1) backwards;transition:transform .9s cubic-bezier(.2,.7,.2,1)}
+.hero-photo:hover .hero-img{transform:scale(1.03)}
+.hero-cta span{display:inline-block;animation:nudge 1.6s ease-in-out infinite}
+.pill.env::before{animation:ping 1.8s ease-out infinite}
+
+.notice{animation:rise .5s .3s cubic-bezier(.2,.7,.2,1) backwards}
+.layout>.panel{animation:rise .6s cubic-bezier(.2,.7,.2,1) backwards}
+.layout>.panel:nth-child(1){animation-delay:.4s}
+.layout>.panel:nth-child(2){animation-delay:.5s}
+.mine{animation:rise .6s .6s cubic-bezier(.2,.7,.2,1) backwards}
+.admin-page main>*{animation:rise .55s cubic-bezier(.2,.7,.2,1) backwards}
+.admin-page main>:nth-child(2){animation-delay:.1s}
+.admin-page main>:nth-child(3){animation-delay:.2s}
+.step-num{transition:transform .25s}
+.panel:hover .step-num{transform:rotate(-8deg) scale(1.08)}
+
+.tab{transition:border-color .15s,background .15s,transform .2s}
+.tab:hover{transform:translateY(-2px)}
+#slots.enter .date-title{animation:fade .4s backwards}
+#slots.enter .slot{animation:rise .45s cubic-bezier(.2,.7,.2,1) backwards;animation-delay:calc(var(--i,0) * 28ms)}
+#slots.enter .seats i{animation:grow .8s .25s cubic-bezier(.2,.7,.2,1) backwards}
+.seats i{transform-origin:left;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.slot.just{animation:pop .38s cubic-bezier(.2,.7,.2,1)}
+.slot.just::after{animation:check-in .38s cubic-bezier(.2,.7,.2,1) backwards}
+.slot.shake,.summary.missing{animation:shake .42s ease}
+.sel-list li.new{animation:rise .35s cubic-bezier(.2,.7,.2,1) backwards}
+.feedback:not(:empty){animation:rise .35s cubic-bezier(.2,.7,.2,1) backwards}
+.ticket{animation:rise .5s cubic-bezier(.2,.7,.2,1) backwards}
+.ticket:nth-child(2){animation-delay:.08s}
+.ticket:nth-child(3){animation-delay:.16s}
+.ticket{transition:transform .2s,box-shadow .2s}
+.ticket:hover{transform:translateY(-2px);box-shadow:0 10px 22px -14px rgba(16,24,40,.35)}
+.mobile-bar.show{animation:slide-up .4s cubic-bezier(.2,.7,.2,1)}
+
+.btn{transition:background .15s,border-color .15s,box-shadow .15s,transform .12s}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.primary{position:relative;overflow:hidden}
+.btn.primary::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.4),transparent);transform:skewX(-20deg);pointer-events:none}
+.btn.primary:not(:disabled):hover::after{animation:shine .8s ease}
+.btn.loading>span:last-child{font-size:0;width:16px;height:16px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+.confetti i{position:absolute;top:-16px;width:8px;height:14px;border-radius:2px;animation:confetti-fall var(--t) cubic-bezier(.25,.6,.35,1) var(--delay) forwards}
+
+/* Scrollbars. Chromium/Safari use the ::-webkit-scrollbar pseudo-elements (rounded orange thumb);
+   Firefox, which lacks them, falls back to the standard scrollbar-color. */
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#f9a868,var(--brand));border:3px solid var(--bg);border-radius:999px;min-height:48px}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--brand),var(--brand-strong));border-width:2px}
+::-webkit-scrollbar-thumb:active{background:var(--brand-strong)}
+::-webkit-scrollbar-corner{background:transparent}
+/* Scroll areas inside white panels: slimmer, white track */
+.table-scroll::-webkit-scrollbar,.import-preview::-webkit-scrollbar,.admin-form textarea::-webkit-scrollbar{width:8px;height:8px}
+.table-scroll::-webkit-scrollbar-track,.import-preview::-webkit-scrollbar-track,.admin-form textarea::-webkit-scrollbar-track{background:#fff;border-radius:999px}
+.table-scroll::-webkit-scrollbar-thumb,.import-preview::-webkit-scrollbar-thumb,.admin-form textarea::-webkit-scrollbar-thumb{background:#f6b88d;border:2px solid #fff;min-width:40px}
+.table-scroll::-webkit-scrollbar-thumb:hover,.import-preview::-webkit-scrollbar-thumb:hover,.admin-form textarea::-webkit-scrollbar-thumb:hover{background:var(--brand)}
+@supports not selector(::-webkit-scrollbar){
+  html{scrollbar-color:var(--brand) var(--bg)}
+  .table-scroll,.import-preview,.admin-form textarea{scrollbar-width:thin;scrollbar-color:#f6b88d #fff}
 }
