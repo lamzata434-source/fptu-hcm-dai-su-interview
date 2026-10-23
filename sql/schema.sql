@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
   singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
   active_env text NOT NULL DEFAULT 'test' CHECK(active_env IN ('test','live')),
   registration_open boolean NOT NULL DEFAULT false,
+  registration_opens_at timestamptz,
+  registration_closes_at timestamptz,
   notice text NOT NULL DEFAULT 'Vui lòng có mặt trước ca phỏng vấn 30 phút để tham gia Seminar 1 theo thông báo của BTC.'
 );
 INSERT INTO app_settings(singleton) VALUES (true) ON CONFLICT DO NOTHING;
@@ -40,6 +42,14 @@ CREATE TABLE IF NOT EXISTS registrations (
 CREATE INDEX IF NOT EXISTS registrations_env_student ON registrations(env,student_id);
 CREATE INDEX IF NOT EXISTS registrations_slot_id ON registrations(slot_id);
 
+-- Moi MSSV chi gui dang ky 1 lan (co the gom nhieu ban); Admin xoa dong de mo khoa.
+CREATE TABLE IF NOT EXISTS registration_locks (
+  env text NOT NULL CHECK(env IN ('test','live')),
+  student_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(env,student_id)
+);
+
 CREATE TABLE IF NOT EXISTS auth_attempts (
   ip_hash text PRIMARY KEY,
   attempts integer NOT NULL DEFAULT 0,
@@ -58,8 +68,9 @@ ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE committees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE slots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE registration_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auth_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_audit ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON app_settings,committees,slots,registrations,auth_attempts,admin_audit FROM anon, authenticated;
+REVOKE ALL ON app_settings,committees,slots,registrations,registration_locks,auth_attempts,admin_audit FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE committees_id_seq, slots_id_seq, registrations_id_seq, admin_audit_id_seq FROM anon, authenticated;
 -- Database connection `postgres` from Vercel uses Postgres permissions on server, not anon key.

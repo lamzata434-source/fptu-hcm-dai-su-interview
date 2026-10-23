@@ -6,6 +6,9 @@
 
 - Trang sinh viên: Họ và tên + MSSV, chọn ca theo một trong ba ban, mỗi ca 15 phút, tối đa 6 sinh viên.
 - Một MSSV chỉ được có **một ca mỗi ban** trong mỗi môi trường. Hai ca thuộc các ban khác nhau cách nhau **ít nhất 15 phút tính theo giờ bắt đầu**.
+- **Mỗi MSSV chỉ gửi đăng ký một lần**: trong lần gửi đó sinh viên chọn được nhiều ban (mỗi ban một ca). Sau khi gửi, MSSV bị khóa; sinh viên không tự sửa, hủy hay đăng ký lại. Admin mở khóa trong mục **KHÓA MSSV** ở `/admin`.
+- Gửi nhiều ban là **tất cả hoặc không**: nếu một ca vừa hết chỗ, không ca nào được lưu và sinh viên được báo chọn ca khác.
+- Admin sửa được **giờ bắt đầu từng ca** và đặt **giờ tự động mở/đóng đăng ký** (dùng để chạy thử).
 - Đăng ký giao dịch nguyên tử dùng PostgreSQL advisory lock theo MSSV và row lock theo slot, tránh giành chỗ cuối và tránh hai ca đụng giờ khi đăng ký đồng thời.
 - Hiển thị số chỗ còn, tự tải lại mỗi 15 giây; xem đăng ký trên chính trình duyệt đã đăng ký bằng mã xác nhận ngẫu nhiên lưu ở `localStorage`.
 - Quản trị: đăng nhập bằng mật khẩu mạnh và cookie HttpOnly, giới hạn đăng nhập sai theo IP, đổi tên 3 ban, thêm/sửa/khóa/xóa ca, sửa suất, chuyển/hủy đăng ký, hai môi trường `test`/`live` riêng biệt, mở/đóng form, thông báo, xuất CSV, xem trước và nhập CSV.
@@ -16,6 +19,7 @@
 
 1. Đăng nhập [Supabase](https://supabase.com/dashboard), tạo Project.
 2. Mở **SQL Editor**, dán và chạy toàn bộ [`sql/schema.sql`](sql/schema.sql).
+   - Database đã tạo từ bản cũ: chạy thêm [`sql/migrate-002-mssv-lock.sql`](sql/migrate-002-mssv-lock.sql) **trước khi deploy** bản có khóa MSSV.
 3. Mở **Connect → Transaction pooler**, sao chép chính xác `DATABASE_URL` (cổng `6543`). Nếu mật khẩu chứa ký tự đặc biệt, URL-encode ký tự đó.
 4. Chọn khu vực phù hợp với chính sách lưu trữ dữ liệu của đơn vị.
 

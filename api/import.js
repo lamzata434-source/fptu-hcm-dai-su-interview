@@ -48,6 +48,7 @@ export default async function handler(req,res){
           const slots=await tx`SELECT id FROM slots WHERE env=${env} AND committee_id=${committee_id} AND start_at=${x.start_at}`;
           if(!slots.length)throw httpError('Chưa có ca tương ứng. Hãy tạo lịch trước khi nhập.');
           const r=await createRegistration(tx,{...x,slot_id:slots[0].id},env,{skipPast:true,allowClosed:true});
+          await tx`INSERT INTO registration_locks(env,student_id) VALUES(${env},${r.student_id}) ON CONFLICT DO NOTHING`;
           await tx`INSERT INTO admin_audit(action,details) VALUES('import_csv',${JSON.stringify({registration_id:r.id,row:line.row,env})}::jsonb)`;
           return r;
         });

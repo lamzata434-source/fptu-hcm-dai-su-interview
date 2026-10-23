@@ -1,11 +1,13 @@
 import {db} from '../lib/db.js';
 import {fail,method,noCache} from '../lib/http.js';
+import {registrationWindow} from '../lib/registration.js';
 export default async function handler(req,res){
   noCache(res);
   try{
     method(req,'GET');const sql=db();
-    const [settings]=await sql`SELECT active_env,registration_open,notice FROM app_settings WHERE singleton=true`;
-    if(!settings)throw new Error('Chưa khởi tạo database');
+    const [row]=await sql`SELECT active_env,registration_open,registration_opens_at,registration_closes_at,notice FROM app_settings WHERE singleton=true`;
+    if(!row)throw new Error('Chưa khởi tạo database');
+    const w=registrationWindow(row), settings={...row,registration_open:w.open,registration_state:w.reason};
     const committees=await sql`SELECT id,name FROM committees ORDER BY id`;
     const slots=await sql`
       SELECT s.id,s.committee_id,s.start_at,s.capacity,s.open,COUNT(r.id)::int AS registered
