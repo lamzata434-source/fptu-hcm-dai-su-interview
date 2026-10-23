@@ -22,12 +22,12 @@ const regView={q:'',committee:'all',days:null,moving:null};
 // Accent-insensitive matching so "thao" finds "Thảo".
 const fold=v=>String(v??'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').toLowerCase();
 let d=null,csvText='',viewEnv='test';
-async function api(path,method='GET',body){const opts={method,headers:{}};if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}const r=await fetch('/api/'+path,opts);const j=await r.json().catch(()=>({error:'Lỗi dữ liệu máy chủ'}));if(!r.ok)throw new Error(j.error||'Có lỗi');return j;}
+async function api(path,method='GET',body){const opts={method,headers:{}};if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}const r=await fetch('/api/'+path,opts);const j=await r.json().catch(()=>({error:'Lỗi dữ liệu máy chủ'}));if(!r.ok)throw Object.assign(new Error(j.error||'Có lỗi'),{details:j.details||[]});return j;}
 let toastTimer;function message(s,error=false){$('admin-message').className='feedback toast '+(error?'error':'success');$('admin-message').textContent=s;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('admin-message').textContent='';},error?8000:4000);}
 async function init(){try{const s=await api('auth');$('login').hidden=s.admin;$('dashboard').hidden=!s.admin;if(s.admin)await refresh();}catch(e){$('login-message').textContent=e.message;}}
 $('login-form').onsubmit=async e=>{e.preventDefault();try{await api('auth','POST',{action:'login',password:$('password').value});$('password').value='';await init();}catch(err){$('login-message').textContent=err.message;}};
 $('logout').onclick=async()=>{await api('auth','POST',{action:'logout'});d=null;await init();};
-$('env-view').onchange=()=>{viewEnv=$('env-view').value;refresh();};
+$('env-view').onchange=()=>{viewEnv=$('env-view').value;$('gen-result').hidden=true;refresh();genPreview();};
 $('reload').onclick=()=>refresh();
 async function refresh(){try{d=await api('admin?env='+viewEnv);render();}catch(e){message(e.message,true);if(e.message.includes('đăng nhập'))await init();}}
 function render(){if(!d)return;
@@ -36,6 +36,7 @@ function render(){if(!d)return;
  $('committee-admin').innerHTML=d.committees.map(c=>`<div class="committee-row"><label for="comname-${c.id}">Ban ${c.id}</label><input id="comname-${c.id}" data-comname="${c.id}" value="${esc(c.name)}"><button class="btn ghost small" type="button" data-rename="${c.id}">Đổi tên</button></div>`).join('');
  const cById=Object.fromEntries(d.committees.map(c=>[c.id,c.name]));
  renderSlots();
+ renderGenCommittees();
  renderRegs();
  renderLocks();
 }
@@ -91,6 +92,32 @@ $('slot-form').onsubmit=e=>{e.preventDefault();if(!$('slot-time').value){message
 $('committee-admin').onclick=e=>{const b=e.target.closest('[data-rename]');if(b){const id=Number(b.dataset.rename);apply({action:'rename_committee',committee_id:id,name:document.querySelector(`[data-comname="${id}"]`).value},'Đã đổi tên ban.');}};
 $('slots-admin').onclick=async e=>{const start=e.target.closest('[data-start-edit]');if(start){slotView.editing=start.dataset.startEdit;renderSlots();document.querySelector(`[data-start="${slotView.editing}"]`)?.focus();return;}if(e.target.closest('[data-cancel-edit]')){slotView.editing=null;renderSlots();return;}
  const edit=e.target.closest('[data-edit]'),del=e.target.closest('[data-delete-slot]');if(edit){const id=edit.dataset.edit;if(await apply({action:'edit_slot',slot_id:Number(id),capacity:Number(document.querySelector(`[data-cap="${id}"]`).value),open:document.querySelector(`[data-open="${id}"]`).value==='true',start_at:fromLocal(document.querySelector(`[data-start="${id}"]`).value)},'Đã cập nhật ca.')){slotView.editing=null;renderSlots();}}if(del){if(confirm('Xóa ca này? Ca có đăng ký sẽ không được xóa.'))apply({action:'delete_slot',slot_id:Number(del.dataset.deleteSlot)},'Đã xóa ca.');}};
+// Automatic schedule generator. The preview mirrors lib/schedule.js planSchedule; the server re-validates.
+const genIds=()=>[...document.querySelectorAll('#gen-committees input:checked')].map(x=>Number(x.value));
+function renderGenCommittees(){if(!d)return;const prev=new Set(document.querySelectorAll('#gen-committees input').length?genIds():d.committees.map(c=>c.id));
+ const cIdx=Object.fromEntries(d.committees.map((c,i)=>[c.id,i]));
+ $('gen-committees').innerHTML=d.committees.map(c=>`<label class="chip check"><input type="checkbox" value="${c.id}"${prev.has(c.id)?' checked':''}><i style="background:${COLORS[cIdx[c.id]%COLORS.length]}"></i>${esc(c.name)}</label>`).join('');
+ if(!$('gen-from').value){const t=dayKey(Date.now()+86400000);$('gen-from').value=t;$('gen-to').value=t;}
+ genPreview();}
+const minutes=v=>{const m=/^(\d\d):(\d\d)$/.exec(v||'');return m?+m[1]*60+ +m[2]:null;};
+function genPreview(){const ids=genIds(),from=$('gen-from').value,to=$('gen-to').value,st=minutes($('gen-start').value),en=minutes($('gen-end').value),bs=minutes($('gen-break-start').value),be=minutes($('gen-break-end').value);
+ const days=from&&to?Math.round((Date.parse(to)-Date.parse(from))/86400000)+1:0;let per=0;
+ if(st!==null&&en!==null)for(let t=st;t+15<=en;t+=15)if(!(bs!==null&&be!==null&&t<be&&t+15>bs))per++;
+ const env=viewEnv==='live'?'Chính thức':'Chạy thử';
+ $('gen-preview').innerHTML=ids.length&&days>0&&per>0?`Sẽ tạo tối đa <b>${per*ids.length*days} ca</b> = ${per} ca/ngày × ${ids.length} ban × ${days} ngày, vào môi trường <b>${env}</b>.`:'Chọn ban, ngày và khung giờ để xem trước số ca.';}
+function genResult(kind,title,items=[]){const box=$('gen-result');box.hidden=false;box.className='gen-result '+kind;
+ box.innerHTML=`<b>${esc(title)}</b>${items.length?`<ul>${items.map(x=>`<li class="${x.warn?'warn':''}">${esc(x.text??x)}</li>`).join('')}</ul>`:''}`;box.scrollIntoView({behavior:'smooth',block:'nearest'});}
+$('gen-form').oninput=genPreview;
+$('gen-form').onsubmit=async e=>{e.preventDefault();
+ const body={action:'generate_slots',env:viewEnv,committee_ids:genIds(),from_date:$('gen-from').value,to_date:$('gen-to').value,start_time:$('gen-start').value,end_time:$('gen-end').value,break_start:$('gen-break-start').value,break_end:$('gen-break-end').value,capacity:Number($('gen-capacity').value)};
+ if(viewEnv==='live'&&!confirm('Tạo lịch vào môi trường CHÍNH THỨC?'))return;
+ $('gen-submit').disabled=true;$('gen-submit').textContent='Đang tạo lịch…';
+ try{const r=await api('admin','POST',body);
+  const shown=viewEnv===d.settings.active_env;
+  genResult(r.warnings.length?'warn':'ok',`Đã tạo ${r.created}/${r.planned} ca.${shown?' Lịch đã hiển thị ngay trên trang đăng ký của sinh viên.':''}${r.warnings.length?' Xem cảnh báo bên dưới.':''}`,[...r.skipped,...r.warnings.map(text=>({text,warn:true}))]);
+  message(`Đã tạo ${r.created} ca mới.`);slotView.days=null;await refresh();}
+ catch(err){genResult('error',err.message,err.details.filter(x=>!err.message.includes(x)));message(err.message,true);}
+ finally{$('gen-submit').disabled=false;$('gen-submit').textContent='Tạo lịch';}};
 $('slot-committee-filter').onclick=e=>{const b=e.target.closest('[data-filter-committee]');if(!b)return;const v=b.dataset.filterCommittee;slotView.committee=v==='all'?'all':Number(v);renderSlots();};
 $('slot-status-filter').onchange=e=>{slotView.status=e.target.value;renderSlots();};
 $('slots-toggle-all').onclick=()=>{const keys=[...$('slots-admin').querySelectorAll('.slot-day')].map(x=>x.dataset.day),all=keys.every(k=>slotView.days.has(k));slotView.days=new Set(all?[]:keys);renderSlots();};

@@ -1,6 +1,7 @@
 import {db} from '../lib/db.js';
 import {fail,method,noCache,requireAdmin,jsonBody,sameOrigin,httpError} from '../lib/http.js';
 import {envClean,intClean,startClean,nameClean,idClean,enoughGap,MIN_START_GAP_MS,GAP_MESSAGE} from '../lib/validation.js';
+import {generateSlots} from '../lib/schedule.js';
 const uniqueSlot=e=>{if(e?.code==='23505')throw httpError('Ban này đã có ca vào giờ đó');throw e;};
 async function audit(tx,action,details){await tx`INSERT INTO admin_audit(action,details) VALUES(${action},${JSON.stringify(details)}::jsonb)`;}
 export default async function handler(req,res){
@@ -74,6 +75,8 @@ export default async function handler(req,res){
         await tx`UPDATE slots SET capacity=${capacity},open=${open},start_at=COALESCE(${start}::timestamptz,start_at) WHERE id=${id}`;
         await audit(tx,action,{id,capacity,open,start});
       }).catch(uniqueSlot);
+    }else if(action==='generate_slots'){
+      return res.status(200).json({ok:true,...await generateSlots(sql,envClean(b.env),b,audit)});
     }else if(action==='unlock_student'){
       // Stored MSSVs may predate the current format check, so match the stored value as-is.
       const env=envClean(b.env), sid=String(b.student_id||'').trim().toUpperCase();

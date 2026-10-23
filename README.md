@@ -8,6 +8,7 @@
 - Một MSSV chỉ được có **một ca mỗi ban** trong mỗi môi trường. Giữa hai ca thuộc các ban khác nhau của cùng một sinh viên phải có **ít nhất 15 phút nghỉ** (ca 15 phút, nên giờ bắt đầu cách nhau ít nhất 30 phút: 14:00 và 14:30 được, 14:00 và 14:15 không được). Kiểm tra cả ở giao diện và máy chủ, theo mọi thứ tự đăng ký.
 - **Mỗi MSSV chỉ gửi đăng ký một lần**: trong lần gửi đó sinh viên chọn được nhiều ban (mỗi ban một ca). Sau khi gửi, MSSV bị khóa; sinh viên không tự sửa, hủy hay đăng ký lại. Admin mở khóa trong mục **KHÓA MSSV** ở `/admin`.
 - Gửi nhiều ban là **tất cả hoặc không**: nếu một ca vừa hết chỗ, không ca nào được lưu và sinh viên được báo chọn ca khác.
+- **Tạo lịch tự động** ở `/admin`: chọn ban, khoảng ngày, khung giờ, giờ nghỉ và số suất; hệ thống tạo các ca 15 phút, bỏ qua ca trùng/chồng giờ/đã qua và báo lỗi cấu hình cụ thể. Sinh viên thấy lịch mới ngay khi mở lại trang hoặc trong vòng 15 giây.
 - Admin sửa được **giờ bắt đầu từng ca** và đặt **giờ tự động mở/đóng đăng ký** (dùng để chạy thử).
 - Đăng ký giao dịch nguyên tử dùng PostgreSQL advisory lock theo MSSV và row lock theo slot, tránh giành chỗ cuối và tránh hai ca đụng giờ khi đăng ký đồng thời.
 - Hiển thị số chỗ còn, tự tải lại mỗi 15 giây; xem đăng ký trên chính trình duyệt đã đăng ký bằng mã xác nhận ngẫu nhiên lưu ở `localStorage`.
