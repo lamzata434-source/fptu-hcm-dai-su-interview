@@ -5,7 +5,7 @@ const fmt=d=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,day:'2-digit',month:'2
 const toISO=(date,time)=>`${date}T${time}:00+07:00`;
 let d=null,csvText='',viewEnv='test';
 async function api(path,method='GET',body){const opts={method,headers:{}};if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}const r=await fetch('/api/'+path,opts);const j=await r.json().catch(()=>({error:'Lỗi dữ liệu máy chủ'}));if(!r.ok)throw new Error(j.error||'Có lỗi');return j;}
-function message(s,error=false){$('admin-message').className='feedback '+(error?'error':'success');$('admin-message').textContent=s;}
+let toastTimer;function message(s,error=false){$('admin-message').className='feedback toast '+(error?'error':'success');$('admin-message').textContent=s;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('admin-message').textContent='';},error?8000:4000);}
 async function init(){try{const s=await api('auth');$('login').hidden=s.admin;$('dashboard').hidden=!s.admin;if(s.admin)await refresh();}catch(e){$('login-message').textContent=e.message;}}
 $('login-form').onsubmit=async e=>{e.preventDefault();try{await api('auth','POST',{action:'login',password:$('password').value});$('password').value='';await init();}catch(err){$('login-message').textContent=err.message;}};
 $('logout').onclick=async()=>{await api('auth','POST',{action:'logout'});d=null;await init();};
@@ -15,7 +15,7 @@ async function refresh(){try{d=await api('admin?env='+viewEnv);render();}catch(e
 function render(){if(!d)return;
  $('env-view').value=viewEnv;$('active-env').value=d.settings.active_env;$('registration-open').value=String(d.settings.registration_open);$('notice-edit').value=d.settings.notice;
  $('new-committee').innerHTML=d.committees.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
- $('committee-admin').innerHTML=d.committees.map(c=>`<div class="admin-controls"><label>Ban ${c.id}</label><input aria-label="Tên ban ${c.id}" data-comname="${c.id}" value="${esc(c.name)}" style="max-width:300px"><button class="btn ghost small" data-rename="${c.id}">Đổi tên</button></div>`).join('');
+ $('committee-admin').innerHTML=d.committees.map(c=>`<div class="committee-row"><label for="comname-${c.id}">Ban ${c.id}</label><input id="comname-${c.id}" data-comname="${c.id}" value="${esc(c.name)}"><button class="btn ghost small" type="button" data-rename="${c.id}">Đổi tên</button></div>`).join('');
  const cById=Object.fromEntries(d.committees.map(c=>[c.id,c.name]));
  $('slots-admin').innerHTML=d.slots.map(s=>`<tr><td>${esc(cById[s.committee_id])}</td><td>${esc(fmt(s.start_at))}</td><td>${s.registered}</td><td><input type="number" min="1" max="200" value="${s.capacity}" data-cap="${s.id}" style="width:65px;padding:6px"></td><td><select data-open="${s.id}"><option value="true" ${s.open?'selected':''}>Mở</option><option value="false" ${!s.open?'selected':''}>Khóa</option></select></td><td><button class="btn ghost small" data-edit="${s.id}">Lưu</button> <button class="btn danger small" data-delete-slot="${s.id}">Xóa</button></td></tr>`).join('')||'<tr><td colspan="6">Chưa có ca. Hãy thêm ca ở trên.</td></tr>';
  $('stats').textContent=d.registrations.length+' lượt đăng ký';
