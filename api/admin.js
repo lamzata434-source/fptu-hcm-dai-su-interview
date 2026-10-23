@@ -75,7 +75,9 @@ export default async function handler(req,res){
         await audit(tx,action,{id,capacity,open,start});
       }).catch(uniqueSlot);
     }else if(action==='unlock_student'){
-      const env=envClean(b.env), sid=idClean(b.student_id);
+      // Stored MSSVs may predate the current format check, so match the stored value as-is.
+      const env=envClean(b.env), sid=String(b.student_id||'').trim().toUpperCase();
+      if(!sid||sid.length>64)throw httpError('MSSV không hợp lệ');
       await sql.begin(async tx=>{
         const r=await tx`DELETE FROM registration_locks WHERE env=${env} AND student_id=${sid} RETURNING student_id`;
         if(!r.length)throw httpError('MSSV này không bị khóa');
