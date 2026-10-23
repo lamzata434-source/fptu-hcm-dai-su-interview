@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nameClean,idClean,envClean,intClean,startClean,enoughGap,csvCell} from '../lib/validation.js';
+import {nameClean,idClean,envClean,intClean,startClean,enoughGap,csvCell,slotIdsClean} from '../lib/validation.js';
 test('student validation',()=>{
  assert.equal(nameClean(' Hồ   Văn A '),'Hồ Văn A');
  assert.equal(idClean(' se123456 '),'SE123456');
@@ -29,4 +29,12 @@ test('registration window',async()=>{
  assert.equal(registrationWindow({registration_open:true,registration_opens_at:'2026-10-27T09:00:00+07:00'},now).reason,'not_yet');
  assert.equal(registrationWindow({registration_open:true,registration_closes_at:'2026-10-27T08:00:00+07:00'},now).reason,'ended');
  assert.equal(registrationWindow({registration_open:true,registration_opens_at:'2026-10-27T07:00:00+07:00',registration_closes_at:'2026-10-27T09:00:00+07:00'},now).open,true);
+});
+test('submission must include a slot',()=>{
+ assert.throws(()=>slotIdsClean({}),/chọn ít nhất một ca/);
+ assert.throws(()=>slotIdsClean({slot_ids:[]}),/chọn ít nhất một ca/);
+ assert.throws(()=>slotIdsClean({slot_ids:['x']}),/không hợp lệ/);
+ assert.deepEqual(slotIdsClean({slot_ids:[3,3,'5']}),[3,5]);
+ assert.deepEqual(slotIdsClean({slot_id:7}),[7]);
+ assert.throws(()=>slotIdsClean({slot_ids:[1,2,3,4,5,6,7,8,9,10,11]}),/tối đa 10/);
 });

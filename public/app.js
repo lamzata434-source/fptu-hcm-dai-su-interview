@@ -42,7 +42,9 @@ function selectedText() {
         ? `<ul class="sel-list">${chosen.map(s => `<li><div><div class="sel-committee">${esc(committeeName(s.committee_id))}</div><div class="sel-date">${esc(dateFmt(s.start_at))}</div></div><span class="sel-time">${esc(timeFmt(s.start_at))}</span><button type="button" class="sel-remove" data-unpick="${s.committee_id}" aria-label="Bỏ chọn ${esc(committeeName(s.committee_id))}">×</button></li>`).join('')}</ul>`
         : 'Chưa chọn ca. Chọn một ca còn chỗ ở mỗi ban bạn muốn ứng tuyển (bước 1).';
     $('summary').classList.toggle('filled', chosen.length > 0);
-    $('submit-btn').disabled = !chosen.length || !state?.settings.registration_open || blocked;
+    if (chosen.length) $('summary').classList.remove('missing');
+    // Stays clickable without a pick so the submit handler can explain what is missing.
+    $('submit-btn').disabled = !state?.settings.registration_open || blocked;
     $('submit-label').textContent = blocked ? 'Đang gửi đăng ký…' : chosen.length > 1 ? `Gửi đăng ký ${chosen.length} ban` : 'Gửi đăng ký';
     $('mobile-bar-text').textContent = chosen.map(s => `${committeeName(s.committee_id)} ${timeFmt(s.start_at)}`).join(' • ');
     updateBar();
@@ -89,7 +91,13 @@ $('selected-slot').addEventListener('click', e => { const b = e.target.closest('
 async function refresh() { try { state = await api('public'); prunePicks(); render(); } catch (e) { setNotice(e.message, 'error'); } }
 $('refresh').addEventListener('click', refresh);
 $('registration-form').addEventListener('submit', async e => {
-    e.preventDefault(); if (blocked || !picks.size) return;
+    e.preventDefault(); if (blocked) return;
+    if (!pickedSlots().length) {
+        feedback('Bạn chưa chọn ca phỏng vấn. Hãy chọn ít nhất một ca còn chỗ ở bước 1 trước khi gửi đăng ký.');
+        $('summary').classList.add('missing');
+        $('booking').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
     const name = $('full-name').value.replace(/\s+/g, ' ').trim(), mssv = $('student-id').value.trim().toUpperCase();
     if (!/^[A-Z]{2}\d{6}$/.test(mssv)) { feedback('MSSV không hợp lệ: gồm 2 chữ cái in hoa và 6 chữ số, ví dụ SE170001.'); $('student-id').focus(); return; }
     // Last chance to catch a typo: once sent, the MSSV is locked and only Admin can fix it.

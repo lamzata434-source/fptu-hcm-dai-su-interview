@@ -1,14 +1,13 @@
 import {db} from '../lib/db.js';
 import {createRegistration,registrationWindow,WINDOW_MESSAGES} from '../lib/registration.js';
 import {fail,method,jsonBody,noCache,sameOrigin,httpError} from '../lib/http.js';
-import {idClean,intClean} from '../lib/validation.js';
+import {idClean,slotIdsClean} from '../lib/validation.js';
 const slotLabel=d=>new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',hour12:false}).format(new Date(d));
 export default async function handler(req,res){
   noCache(res);
   try{
     method(req,'POST');sameOrigin(req);const body=jsonBody(req);const sql=db();
-    const slotIds=[...new Set((Array.isArray(body.slot_ids)?body.slot_ids:[body.slot_id]).map(x=>intClean(x)))];
-    if(slotIds.length>10)throw httpError('Chọn tối đa 10 ca');
+    const slotIds=slotIdsClean(body);
     const sid=idClean(body.student_id);
     const result=await sql.begin(async tx=>{
       const [settings]=await tx`SELECT active_env,registration_open,registration_opens_at,registration_closes_at FROM app_settings WHERE singleton=true FOR SHARE`;
