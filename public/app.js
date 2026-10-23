@@ -126,7 +126,7 @@ $('registration-form').addEventListener('submit', async e => {
     if (!pickedSlots().length) {
         feedback('Bạn chưa chọn ca phỏng vấn. Hãy chọn ít nhất một ca còn chỗ ở bước 2 trước khi gửi đăng ký.');
         replay($('summary'), 'missing');
-        $('booking').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('slot-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
     }
     const chosen = pickedSlots();
@@ -162,4 +162,8 @@ addEventListener('scroll', () => $('topbar').classList.toggle('scrolled', scroll
 $('student-id').addEventListener('input', e => { const el = e.target, pos = el.selectionStart; el.value = el.value.toUpperCase(); el.setSelectionRange(pos, pos); });
 new IntersectionObserver(([entry]) => { formVisible = entry.isIntersecting; updateBar(); }).observe($('registration-form'));
 $('mobile-bar-go').addEventListener('click', () => { $('form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('full-name').focus({ preventScroll: true }); });
-await refresh(); await refreshMy(); setInterval(refresh, 15000);
+// New or changed slots (e.g. a freshly generated schedule) show up within 15 seconds, or at once when the
+// student comes back to the tab or the browser restores the page from its back/forward cache.
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+addEventListener('pageshow', e => { if (e.persisted) refresh(); });
+await refresh(); await refreshMy(); setInterval(() => { if (!document.hidden) refresh(); }, 15000);

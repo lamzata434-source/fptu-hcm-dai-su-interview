@@ -29,19 +29,6 @@
   <div id="notice" class="notice" role="status"><span class="notice-icon" aria-hidden="true"></span><span id="notice-text">Đang tải thông báo từ Ban tổ chức…</span></div>
 
   <div id="booking" class="layout">
-    <section class="panel main-panel">
-      <header class="panel-header">
-        <div class="panel-title"><span class="step-num" aria-hidden="true">2</span><div><h2>Chọn thời gian phù hợp</h2><p>Mỗi ban chọn tối đa một ca; có thể chọn nhiều ban. Giữa hai ca cần nghỉ ít nhất 15 phút (ví dụ 14:00 và 14:30).</p></div></div>
-        <button id="refresh" class="btn ghost small" type="button">↻ Cập nhật</button>
-      </header>
-      <div id="committee-tabs" class="tabs" role="tablist" aria-label="Chọn ban"></div>
-      <div class="panel-body">
-        <p id="slot-alert" class="feedback error slot-alert" role="alert"></p>
-        <div id="slots" class="slots" aria-live="polite"><div class="skeleton" aria-label="Đang tải lịch phỏng vấn"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
-        <p id="refresh-info" class="sync">Tự cập nhật mỗi 15 giây</p>
-      </div>
-    </section>
-
     <section id="form-panel" class="panel form-panel">
       <header class="panel-header">
         <div class="panel-title"><span class="step-num" aria-hidden="true">1</span><div><h2>Thông tin đăng ký</h2><p>Mỗi MSSV chỉ được gửi đăng ký một lần. Kiểm tra kỹ trước khi gửi.</p></div></div>
@@ -54,6 +41,19 @@
         <p class="fineprint">Sau khi gửi, MSSV sẽ được khóa: sinh viên không thể tự sửa, hủy hoặc đăng ký lại. Nếu cần thay đổi, vui lòng liên hệ Admin.</p>
         <p id="feedback" class="feedback" role="alert" aria-live="polite"></p>
       </form>
+    </section>
+
+    <section id="slot-panel" class="panel main-panel">
+      <header class="panel-header">
+        <div class="panel-title"><span class="step-num" aria-hidden="true">2</span><div><h2>Chọn thời gian phù hợp</h2><p>Mỗi ban chọn tối đa một ca; có thể chọn nhiều ban. Giữa hai ca cần nghỉ ít nhất 15 phút (ví dụ 14:00 và 14:30).</p></div></div>
+        <button id="refresh" class="btn ghost small" type="button">↻ Cập nhật</button>
+      </header>
+      <div id="committee-tabs" class="tabs" role="tablist" aria-label="Chọn ban"></div>
+      <div class="panel-body">
+        <p id="slot-alert" class="feedback error slot-alert" role="alert"></p>
+        <div id="slots" class="slots" aria-live="polite"><div class="skeleton" aria-label="Đang tải lịch phỏng vấn"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+        <p id="refresh-info" class="sync">Tự cập nhật mỗi 15 giây</p>
+      </div>
     </section>
   </div>
 
