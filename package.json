@@ -7,14 +7,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "local": "vercel dev --local",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check api/public.js && node --check api/register.js && node --check api/admin.js && node --check api/auth.js && node --check api/import.js"
   },
   "dependencies": {
     "csv-parse": "^5.6.0",
-    "next": "16.4.2",
     "postgres": "^3.4.7",
     "vercel": "^65.0.0"
   }
