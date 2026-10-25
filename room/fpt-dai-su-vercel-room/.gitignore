@@ -1,0 +1,10 @@
+node_modules/
+.vercel/
+.env
+.env.*
+!.env.example
+*.csv
+!import-template.csv
+*.xlsx
+*.log
+.DS_Store
