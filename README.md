@@ -7,6 +7,7 @@
 - Trang sinh viên: Họ và tên + MSSV, chọn phiên phỏng vấn (giao diện gọi là **phiên**; trong code và database vẫn là `slots`) theo từng ban, mỗi phiên 15 phút.
 - **Thông báo từ Ban tổ chức** hiển thị đầu trang trong thẻ nổi bật, giữ nguyên nội dung Admin nhập (xuống dòng được giữ lại).
 - **Phòng phỏng vấn** theo từng phiên: Admin nhập khi thêm phiên, khi tạo lịch tự động (áp cho mọi phiên được tạo) hoặc khi sửa phiên (có tuỳ chọn áp cho mọi phiên cùng ban/nhóm trong ngày). Sinh viên thấy phòng trên lịch, lúc xác nhận, sau khi đăng ký; Admin thấy trong danh sách và file CSV (cột `room`).
+- **Thông báo trực tiếp cho Admin** (chuông ở thanh công cụ `/admin`): khi có sinh viên đăng ký, bị hủy hoặc được chuyển phiên, trang Quản trị hiện thông báo nổi, đếm số chưa đọc, giữ danh sách trong phiên làm việc và (nếu cho phép) gửi thông báo của trình duyệt khi đang ở tab khác. Dùng **Supabase Realtime** (WebSocket): database phát tín hiệu không chứa tên/MSSV, trang Quản trị tự tải chi tiết qua API đã đăng nhập. Cần chạy [`sql/migrate-004-admin-live.sql`](sql/migrate-004-admin-live.sql) và thêm biến `SUPABASE_URL`, `SUPABASE_ANON_KEY` trên Vercel; nếu chưa cấu hình, trang tự kiểm tra mỗi 20 giây.
 - **Nhóm con** (ví dụ Đại sứ Truyền thông: Creative Team, Product Team, Digital Team): khai báo trong mục Danh sách ban. Sinh viên chọn đúng một nhóm trước khi chọn phiên của ban đó. Phiên có thể dùng chung cho mọi nhóm hoặc dành riêng một nhóm (các nhóm được phỏng vấn cùng giờ ở phòng khác nhau). Admin lọc, đếm, đổi nhóm của từng đăng ký; CSV có cột `subteam`.
 - Một MSSV chỉ được có **một ca mỗi ban** trong mỗi môi trường. Giữa hai ca thuộc các ban khác nhau của cùng một sinh viên phải có **ít nhất 15 phút nghỉ** (ca 15 phút, nên giờ bắt đầu cách nhau ít nhất 30 phút: 14:00 và 14:30 được, 14:00 và 14:15 không được). Kiểm tra cả ở giao diện và máy chủ, theo mọi thứ tự đăng ký.
 - **Mỗi MSSV chỉ gửi đăng ký một lần**: trong lần gửi đó sinh viên chọn được nhiều ban (mỗi ban một ca). Sau khi gửi, MSSV bị khóa; sinh viên không tự sửa, hủy hay đăng ký lại. Admin mở khóa trong mục **KHÓA MSSV** ở `/admin`.
@@ -25,6 +26,7 @@
 2. Mở **SQL Editor**, dán và chạy toàn bộ [`sql/schema.sql`](sql/schema.sql).
    - Database đã tạo từ bản cũ: chạy thêm [`sql/migrate-002-mssv-lock.sql`](sql/migrate-002-mssv-lock.sql) **trước khi deploy** bản có khóa MSSV.
    - Rồi chạy [`sql/migrate-003-room-subteam.sql`](sql/migrate-003-room-subteam.sql) **trước khi deploy** bản có phòng và nhóm con. Chỉ thêm cột/chỉ mục, không đổi dữ liệu cũ; chạy lại nhiều lần vẫn an toàn.
+   - Rồi chạy [`sql/migrate-004-admin-live.sql`](sql/migrate-004-admin-live.sql) để bật thông báo trực tiếp cho Admin (không ảnh hưởng dữ liệu).
 3. Mở **Connect → Transaction pooler**, sao chép chính xác `DATABASE_URL` (cổng `6543`). Nếu mật khẩu chứa ký tự đặc biệt, URL-encode ký tự đó.
 4. Chọn khu vực phù hợp với chính sách lưu trữ dữ liệu của đơn vị.
 

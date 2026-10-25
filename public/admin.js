@@ -9,6 +9,7 @@ const dayKey=d=>new Intl.DateTimeFormat('sv-SE',{timeZone:tz,year:'numeric',mont
 const dayLabel=d=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(d));
 const hm=d=>new Intl.DateTimeFormat('vi-VN',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(d));
 const COLORS=['#f26f21','#1f5eab','#3fb27a','#9b5de5','#e0457b'];
+const ICON_BELL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
 const ICON_EDIT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 const ICON_TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="m19 6-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 // Slot list view state: filters, expanded day groups, and the single row being edited.
@@ -29,12 +30,12 @@ const fold=v=>String(v??'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/
 let d=null,csvText='',viewEnv='test';
 async function api(path,method='GET',body){const opts={method,headers:{}};if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}const r=await fetch('/api/'+path,opts);const j=await r.json().catch(()=>({error:'Lỗi dữ liệu máy chủ'}));if(!r.ok)throw Object.assign(new Error(j.error||'Có lỗi'),{details:j.details||[]});return j;}
 let toastTimer;function message(s,error=false){$('admin-message').className='feedback toast '+(error?'error':'success');$('admin-message').textContent=s;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{$('admin-message').textContent='';},error?8000:4000);}
-async function init(){try{const s=await api('auth');$('login').hidden=s.admin;$('dashboard').hidden=!s.admin;if(s.admin)await refresh();}catch(e){$('login-message').textContent=e.message;}}
+async function init(){try{const s=await api('auth');$('login').hidden=s.admin;$('dashboard').hidden=!s.admin;if(s.admin){await refresh();startLive();}else stopLive();}catch(e){$('login-message').textContent=e.message;}}
 $('login-form').onsubmit=async e=>{e.preventDefault();try{await api('auth','POST',{action:'login',password:$('password').value});$('password').value='';await init();}catch(err){$('login-message').textContent=err.message;}};
 $('logout').onclick=async()=>{await api('auth','POST',{action:'logout'});d=null;await init();};
 $('env-view').onchange=()=>{viewEnv=$('env-view').value;$('gen-result').hidden=true;refresh();genPreview();};
 $('reload').onclick=()=>refresh();
-async function refresh(){try{d=await api('admin?env='+viewEnv);render();}catch(e){message(e.message,true);if(e.message.includes('đăng nhập'))await init();}}
+async function refresh(){try{d=await api('admin?env='+viewEnv);if(live.started)liveSnapshot(d);render();}catch(e){message(e.message,true);if(e.message.includes('đăng nhập'))await init();}}
 function render(){if(!d)return;
  $('env-view').value=viewEnv;$('active-env').value=d.settings.active_env;$('registration-open').value=String(d.settings.registration_open);$('notice-edit').value=d.settings.notice;$('opens-at').value=vnLocal(d.settings.registration_opens_at);$('closes-at').value=vnLocal(d.settings.registration_closes_at);
  const keepCommittee=$('new-committee').value;$('new-committee').innerHTML=d.committees.map(c=>`<option value="${c.id}"${String(c.id)===keepCommittee?' selected':''}>${esc(c.name)}</option>`).join('');
@@ -153,4 +154,53 @@ $('export').onclick=()=>{window.location.href='/api/export?env='+viewEnv;};
 $('import-file').onchange=async e=>{csvText='';$('confirm-import').disabled=true;$('import-preview').textContent='';const f=e.target.files?.[0];if(!f)return;if(f.size>550000){message('Tệp tối đa 550KB. Chia nhỏ thành các phần 150 dòng.',true);return;}csvText=await f.text();};
 $('preview-import').onclick=async()=>{if(!csvText)return message('Chọn tệp CSV trước.',true);try{const j=await api('import','POST',{env:viewEnv,csv:csvText,preview:true});$('import-preview').textContent=JSON.stringify(j,null,2);$('confirm-import').disabled=j.total===0||j.invalid>0;message(`Đã xem trước ${j.total} dòng; ${j.invalid} dòng có lỗi.`);}catch(e){message(e.message,true);}};
 $('confirm-import').onclick=async()=>{if(!csvText||!confirm(`Nhập CSV vào môi trường ${viewEnv==='test'?'CHẠY THỬ':'CHÍNH THỨC'}?`))return;try{const j=await api('import','POST',{env:viewEnv,csv:csvText,confirm:true});$('import-preview').textContent=JSON.stringify(j,null,2);$('confirm-import').disabled=true;csvText='';message(`Đã nhập ${j.imported}/${j.total}; lỗi ${j.failed}. Hãy xem kết quả bên dưới.`,j.failed>0);await refresh();}catch(e){message(e.message,true);}};
+// Live notifications. Supabase Realtime sends a ping on every booking change (no names or MSSV in it); the page
+// then reloads the lists through the logged-in admin API and announces what changed. A slower check runs as a
+// safety net, and is the only source when Realtime is not configured.
+const live={started:false,client:null,channel:null,poll:null,timer:null,seen:null,feed:[],unread:0,state:'off',baseTitle:document.title};
+const ENV_NAME={test:'Chạy thử',live:'Chính thức'};
+const dm=d=>new Intl.DateTimeFormat('en-GB',{timeZone:tz,day:'2-digit',month:'2-digit'}).format(new Date(d));
+const regKey=r=>`${r.slot_id}|${r.subteam||''}`;
+function liveSnapshot(data){live.seen=new Map(data.registrations.map(r=>[String(r.id),regKey(r)]));}
+function liveStatus(state,text){live.state=state;$('live-status').className='live-status '+state;$('live-status-text').textContent=text;}
+function renderFeed(){$('live-count').hidden=!live.unread;$('live-count').textContent=live.unread>99?'99+':live.unread;
+ document.title=live.unread&&document.hidden?`(${live.unread}) ${live.baseTitle}`:live.baseTitle;
+ $('live-list').innerHTML=live.feed.map(n=>`<li class="${n.kind}"><span>${esc(n.text)}</span><time>${esc(hm(n.at))}</time></li>`).join('')||'<li class="empty">Chưa có thông báo mới trong phiên làm việc này.</li>';
+ $('live-browser').hidden=!('Notification' in window)||Notification.permission!=='default';}
+function notify(text,kind='new'){const n={text,kind,at:Date.now()};live.feed.unshift(n);live.feed.length=Math.min(live.feed.length,40);if($('live-panel').hidden)live.unread++;renderFeed();
+ const t=document.createElement('div');t.className='live-toast '+kind;t.innerHTML=`${ICON_BELL}<span>${esc(text)}</span>`;$('live-toasts').prepend(t);setTimeout(()=>t.classList.add('out'),6500);setTimeout(()=>t.remove(),7000);
+ while($('live-toasts').children.length>4)$('live-toasts').lastChild.remove();
+ if(document.hidden&&'Notification' in window&&Notification.permission==='granted')try{new Notification('Đăng ký phỏng vấn Đại sứ',{body:text,icon:'/logo-fpt.webp',tag:'fptu-admin-'+n.at});}catch{}}
+const slotText=r=>`${r.committee_name}${r.subteam?' · '+r.subteam:''} ${hm(r.start_at)} ${dm(r.start_at)}`;
+async function liveCheck(){const env=viewEnv;let fresh;try{fresh=await api('admin?env='+env);}catch{return;}
+ if(env!==viewEnv||!live.seen)return;
+ const added=fresh.registrations.filter(r=>!live.seen.has(String(r.id))),ids=new Set(fresh.registrations.map(r=>String(r.id)));
+ const moved=fresh.registrations.filter(r=>live.seen.has(String(r.id))&&live.seen.get(String(r.id))!==regKey(r));
+ const removed=[...live.seen.keys()].filter(id=>!ids.has(id)).length;
+ const byStudent=new Map();added.forEach(r=>{if(!byStudent.has(r.student_id))byStudent.set(r.student_id,[]);byStudent.get(r.student_id).push(r);});
+ for(const rs of byStudent.values())notify(`${rs[0].student_name} (${rs[0].student_id}) vừa đăng ký: ${rs.map(slotText).join('; ')}.`,'new');
+ moved.forEach(r=>notify(`${r.student_name} (${r.student_id}) được chuyển sang ${slotText(r)}.`,'move'));
+ if(removed)notify(`${removed} đăng ký vừa bị hủy.`,'cancel');
+ liveSnapshot(fresh);
+ // Re-render the lists only; settings and forms the admin may be typing in stay untouched, and an open editor row is kept.
+ d=fresh;if(!slotView.editing)renderSlots();if(!regView.moving)renderRegs();renderLocks();}
+function liveEvent(p){if(p?.env&&p.env!==viewEnv){notify(`Có thay đổi đăng ký ở môi trường ${ENV_NAME[p.env]||p.env} (đang xem ${ENV_NAME[viewEnv]}).`,'other');return;}
+ clearTimeout(live.timer);live.timer=setTimeout(liveCheck,400);}
+async function startLive(){if(live.started||!d)return;live.started=true;liveSnapshot(d);renderFeed();
+ const rt=d.realtime;
+ if(rt){liveStatus('wait','Đang kết nối trực tiếp…');
+  try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
+   live.client=createClient(rt.url,rt.key,{auth:{persistSession:false,autoRefreshToken:false}});
+   live.channel=live.client.channel('admin-feed').on('broadcast',{event:'registration'},({payload})=>liveEvent(payload))
+    .subscribe(st=>{if(st==='SUBSCRIBED'){liveStatus('on','Trực tiếp');liveCheck();}else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(st)&&live.started)liveStatus('wait','Mất kết nối, đang thử lại…');});}
+  catch(e){console.error('realtime',e);liveStatus('poll','Tự kiểm tra mỗi 20 giây');}}
+ else liveStatus('poll','Tự kiểm tra mỗi 20 giây');
+ live.poll=setInterval(()=>{if(live.state!=='on'||Date.now()-(live.lastPoll||0)>120000){live.lastPoll=Date.now();liveCheck();}},20000);}
+function stopLive(){live.started=false;clearInterval(live.poll);clearTimeout(live.timer);if(live.channel)live.client?.removeChannel(live.channel);live.channel=live.client=null;live.feed=[];live.unread=0;liveStatus('off','Thông báo: đang tắt');renderFeed();}
+$('live-bell').onclick=e=>{e.stopPropagation();const open=$('live-panel').hidden;$('live-panel').hidden=!open;$('live-bell').setAttribute('aria-expanded',open);if(open){live.unread=0;renderFeed();}};
+document.addEventListener('click',e=>{if(!$('live-panel').hidden&&!e.target.closest('.live-box')){$('live-panel').hidden=true;$('live-bell').setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('live-panel').hidden){$('live-panel').hidden=true;$('live-bell').setAttribute('aria-expanded','false');$('live-bell').focus();}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)document.title=live.baseTitle;});
+$('live-clear').onclick=()=>{live.feed=[];live.unread=0;renderFeed();};
+$('live-browser').onclick=async()=>{try{await Notification.requestPermission();}catch{}renderFeed();};
 await init();

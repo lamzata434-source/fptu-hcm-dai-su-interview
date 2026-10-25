@@ -80,3 +80,23 @@ ALTER TABLE admin_audit ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON app_settings,committees,slots,registrations,registration_locks,auth_attempts,admin_audit FROM anon, authenticated;
 REVOKE ALL ON SEQUENCE committees_id_seq, slots_id_seq, registrations_id_seq, admin_audit_id_seq FROM anon, authenticated;
 -- Database connection `postgres` from Vercel uses Postgres permissions on server, not anon key.
+
+-- Thong bao truc tiep cho Quan tri (Supabase Realtime); xem sql/migrate-004-admin-live.sql.
+CREATE OR REPLACE FUNCTION notify_admin_feed() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE r registrations;
+BEGIN
+  r := COALESCE(NEW, OLD);
+  BEGIN
+    PERFORM realtime.send(
+      jsonb_build_object('op', lower(TG_OP), 'env', r.env, 'id', r.id, 'committee_id', r.committee_id),
+      'registration', 'admin-feed', false);
+  EXCEPTION WHEN others THEN
+    NULL; -- Realtime chua bat hoac loi tam thoi: khong chan viec dang ky.
+  END;
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION notify_admin_feed() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS registrations_admin_feed ON registrations;
+CREATE TRIGGER registrations_admin_feed AFTER INSERT OR UPDATE OF slot_id, subteam OR DELETE ON registrations
+FOR EACH ROW EXECUTE FUNCTION notify_admin_feed();

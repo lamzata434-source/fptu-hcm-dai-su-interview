@@ -2,6 +2,8 @@ import {db} from '../lib/db.js';
 import {fail,method,noCache,requireAdmin,jsonBody,sameOrigin,httpError} from '../lib/http.js';
 import {envClean,intClean,startClean,nameClean,idClean,enoughGap,MIN_START_GAP_MS,GAP_MESSAGE,roomClean,subteamListClean,bookingSubteam} from '../lib/validation.js';
 import {generateSlots} from '../lib/schedule.js';
+// Public Supabase Realtime settings for live admin notifications; null when not configured (the page then polls).
+const realtimeConfig=()=>{const url=process.env.SUPABASE_URL||'',key=process.env.SUPABASE_ANON_KEY||'';return /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(url)&&key?{url:url.replace(/\/$/,''),key}:null;};
 const uniqueSlot=e=>{if(e?.code==='23505')throw httpError('Ban (hoặc nhóm) này đã có phiên vào giờ đó');throw e;};
 // A session's subteam: '' (shared by all subteams of the committee) or one of the committee's subteams.
 const slotSubteam=(subteams,v)=>{v=String(v??'').trim();if(v&&!subteams.includes(v))throw httpError(subteams.length?`Nhóm không hợp lệ. Hãy chọn một trong: ${subteams.join(', ')}`:'Ban này không chia nhóm');return v;};
@@ -29,7 +31,7 @@ export default async function handler(req,res){
           (SELECT r.student_name FROM registrations r WHERE r.env=l.env AND r.student_id=l.student_id ORDER BY r.created_at DESC LIMIT 1) AS student_name,
           (SELECT COUNT(*)::int FROM registrations r WHERE r.env=l.env AND r.student_id=l.student_id) AS registered
         FROM registration_locks l WHERE l.env=${env} ORDER BY l.created_at DESC`;
-      return res.status(200).json({settings,committees,slots,registrations,locks});
+      return res.status(200).json({settings,committees,slots,registrations,locks,realtime:realtimeConfig()});
     }
     method(req,'POST');sameOrigin(req);const b=jsonBody(req);
     const action=String(b.action||'');
