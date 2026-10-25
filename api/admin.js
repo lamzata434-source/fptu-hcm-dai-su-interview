@@ -1,8 +1,10 @@
 import {db} from '../lib/db.js';
 import {fail,method,noCache,requireAdmin,jsonBody,sameOrigin,httpError} from '../lib/http.js';
-import {envClean,intClean,startClean,nameClean,idClean,enoughGap,MIN_START_GAP_MS,GAP_MESSAGE} from '../lib/validation.js';
+import {envClean,intClean,startClean,nameClean,idClean,enoughGap,MIN_START_GAP_MS,GAP_MESSAGE,roomClean,subteamListClean,bookingSubteam} from '../lib/validation.js';
 import {generateSlots} from '../lib/schedule.js';
-const uniqueSlot=e=>{if(e?.code==='23505')throw httpError('Ban này đã có ca vào giờ đó');throw e;};
+const uniqueSlot=e=>{if(e?.code==='23505')throw httpError('Ban (hoặc nhóm) này đã có phiên vào giờ đó');throw e;};
+// A session's subteam: '' (shared by all subteams of the committee) or one of the committee's subteams.
+const slotSubteam=(subteams,v)=>{v=String(v??'').trim();if(v&&!subteams.includes(v))throw httpError(subteams.length?`Nhóm không hợp lệ. Hãy chọn một trong: ${subteams.join(', ')}`:'Ban này không chia nhóm');return v;};
 async function audit(tx,action,details){await tx`INSERT INTO admin_audit(action,details) VALUES(${action},${JSON.stringify(details)}::jsonb)`;}
 export default async function handler(req,res){
   noCache(res);
@@ -11,14 +13,14 @@ export default async function handler(req,res){
     if(req.method==='GET'){
       const env=envClean(String(req.query?.env||'test'));
       const [settings]=await sql`SELECT active_env,registration_open,registration_opens_at,registration_closes_at,notice FROM app_settings`;
-      const committees=await sql`SELECT id,name FROM committees ORDER BY id`;
+      const committees=await sql`SELECT id,name,subteams FROM committees ORDER BY id`;
       const slots=await sql`
-        SELECT s.id,s.env,s.committee_id,s.start_at,s.capacity,s.open,COUNT(r.id)::int AS registered
+        SELECT s.id,s.env,s.committee_id,s.start_at,s.room,s.subteam,s.capacity,s.open,COUNT(r.id)::int AS registered
         FROM slots s LEFT JOIN registrations r ON r.slot_id=s.id
         WHERE s.env=${env} GROUP BY s.id ORDER BY s.start_at,s.committee_id`;
       const registrations=await sql`
-        SELECT r.id,r.student_name,r.student_id,r.created_at,r.slot_id,
-          c.name AS committee_name,s.start_at,s.committee_id
+        SELECT r.id,r.student_name,r.student_id,r.created_at,r.slot_id,r.subteam,
+          c.name AS committee_name,s.start_at,s.room,s.committee_id
         FROM registrations r JOIN slots s ON s.id=r.slot_id
         JOIN committees c ON c.id=r.committee_id
         WHERE r.env=${env} ORDER BY s.start_at,r.created_at`;
@@ -44,23 +46,38 @@ export default async function handler(req,res){
         await audit(tx,'settings',{active_env,registration_open,opens,closes});
       });
     }else if(action==='rename_committee'){
-      const id=intClean(b.committee_id,1,1000), name=nameClean(b.name);
+      const id=intClean(b.committee_id,1,1000), name=nameClean(b.name), subteams=b.subteams===undefined?null:subteamListClean(b.subteams);
       await sql.begin(async tx=>{
-        const r=await tx`UPDATE committees SET name=${name} WHERE id=${id} RETURNING id`;
+        if(subteams){
+          const used=await tx`
+            SELECT subteam FROM slots WHERE committee_id=${id} AND subteam<>'' AND NOT (subteam=ANY(${subteams}::text[]))
+            UNION SELECT subteam FROM registrations WHERE committee_id=${id} AND subteam<>'' AND NOT (subteam=ANY(${subteams}::text[]))`;
+          if(used.length)throw httpError(`Không thể bỏ nhóm ${used.map(x=>x.subteam).join(', ')} vì còn phiên hoặc đăng ký thuộc nhóm này. Hãy chuyển hoặc xóa chúng trước.`);
+        }
+        const r=await tx`UPDATE committees SET name=${name},subteams=COALESCE(${subteams}::text[],subteams) WHERE id=${id} RETURNING id`;
         if(!r.length)throw httpError('Không tìm thấy ban');
-        await audit(tx,action,{id,name});
+        await audit(tx,action,{id,name,subteams});
       });
     }else if(action==='create_slot'){
-      const env=envClean(b.env), cid=intClean(b.committee_id,1,1000), start=startClean(b.start_at), capacity=intClean(b.capacity,1,200);
+      const env=envClean(b.env), cid=intClean(b.committee_id,1,1000), start=startClean(b.start_at), capacity=intClean(b.capacity,1,200), room=roomClean(b.room);
       await sql.begin(async tx=>{
-        await tx`INSERT INTO slots(env,committee_id,start_at,capacity,open) VALUES(${env},${cid},${start},${capacity},true)`;
-        await audit(tx,action,{env,cid,start,capacity});
+        const [c]=await tx`SELECT subteams FROM committees WHERE id=${cid}`;
+        if(!c)throw httpError('Không tìm thấy ban');
+        const subteam=slotSubteam(c.subteams,b.subteam);
+        await tx`INSERT INTO slots(env,committee_id,start_at,room,subteam,capacity,open) VALUES(${env},${cid},${start},${room},${subteam},${capacity},true)`;
+        await audit(tx,action,{env,cid,start,room,subteam,capacity});
       }).catch(uniqueSlot);
     }else if(action==='edit_slot'){
       const id=intClean(b.slot_id),capacity=intClean(b.capacity,1,200), open=b.open===true, start=b.start_at?startClean(b.start_at):null;
+      const room=b.room===undefined?null:roomClean(b.room);
       await sql.begin(async tx=>{
-        const [slot]=await tx`SELECT id FROM slots WHERE id=${id} FOR UPDATE`;
-        if(!slot)throw httpError('Không tìm thấy ca');
+        const [slot]=await tx`SELECT s.id,s.env,s.committee_id,s.start_at,s.subteam,c.subteams FROM slots s JOIN committees c ON c.id=s.committee_id WHERE s.id=${id} FOR UPDATE OF s`;
+        if(!slot)throw httpError('Không tìm thấy phiên');
+        const subteam=b.subteam===undefined?slot.subteam:slotSubteam(slot.subteams,b.subteam);
+        if(subteam){
+          const [other]=await tx`SELECT 1 FROM registrations WHERE slot_id=${id} AND subteam<>${subteam} LIMIT 1`;
+          if(other)throw httpError(`Phiên đã có sinh viên không thuộc ${subteam}. Hãy chuyển các sinh viên đó trước khi dành phiên cho ${subteam}.`);
+        }
         const [count]=await tx`SELECT COUNT(*)::int AS n FROM registrations WHERE slot_id=${id}`;
         if(count.n>capacity)throw httpError('Sức chứa thấp hơn số sinh viên đã đăng ký');
         if(start){
@@ -70,10 +87,19 @@ export default async function handler(req,res){
             JOIN registrations o ON o.env=r.env AND o.student_id=r.student_id AND o.id<>r.id
             JOIN slots s ON s.id=o.slot_id
             WHERE r.slot_id=${id} AND abs(extract(epoch FROM s.start_at-${start}::timestamptz))<${MIN_START_GAP_MS/1000} LIMIT 1`;
-          if(clash.length)throw httpError('Giờ mới khiến một sinh viên trong ca không còn đủ 15 phút nghỉ giữa hai ca.');
+          if(clash.length)throw httpError('Giờ mới khiến một sinh viên trong phiên không còn đủ 15 phút nghỉ giữa hai phiên.');
         }
-        await tx`UPDATE slots SET capacity=${capacity},open=${open},start_at=COALESCE(${start}::timestamptz,start_at) WHERE id=${id}`;
-        await audit(tx,action,{id,capacity,open,start});
+        await tx`UPDATE slots SET capacity=${capacity},open=${open},start_at=COALESCE(${start}::timestamptz,start_at),room=COALESCE(${room},room),subteam=${subteam} WHERE id=${id}`;
+        let roomCount=0;
+        if(room!==null&&b.room_scope==='day'){
+          // One room for every session of this committee (and subteam) on that day, so it is typed only once.
+          const r=await tx`
+            UPDATE slots SET room=${room} WHERE env=${slot.env} AND committee_id=${slot.committee_id} AND subteam=${subteam} AND id<>${id}
+              AND (start_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date=(COALESCE(${start}::timestamptz,${slot.start_at}::timestamptz) AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+            RETURNING id`;
+          roomCount=r.length;
+        }
+        await audit(tx,action,{id,capacity,open,start,room,subteam,room_scope:b.room_scope||'slot',roomCount});
       }).catch(uniqueSlot);
     }else if(action==='generate_slots'){
       return res.status(200).json({ok:true,...await generateSlots(sql,envClean(b.env),b,audit)});
@@ -90,9 +116,9 @@ export default async function handler(req,res){
       const id=intClean(b.slot_id);
       await sql.begin(async tx=>{
         const [v]=await tx`SELECT id FROM slots WHERE id=${id} FOR UPDATE`;
-        if(!v)throw httpError('Không tìm thấy ca');
+        if(!v)throw httpError('Không tìm thấy phiên');
         const [n]=await tx`SELECT COUNT(*)::int AS n FROM registrations WHERE slot_id=${id}`;
-        if(n.n)throw httpError('Ca có đăng ký. Hãy chuyển hoặc hủy các đăng ký trước.');
+        if(n.n)throw httpError('Phiên có đăng ký. Hãy chuyển hoặc hủy các đăng ký trước.');
         await tx`DELETE FROM slots WHERE id=${id}`;
         await audit(tx,action,{id});
       });
@@ -129,20 +155,35 @@ export default async function handler(req,res){
         await tx`SELECT pg_advisory_xact_lock(hashtext(${old0.env+':'+old0.student_id}))`;
         const [old]=await tx`SELECT * FROM registrations WHERE id=${id} FOR UPDATE`;
         if(!old)throw httpError('Không tìm thấy đăng ký');
-        if(old.slot_id===newSlot)throw httpError('Ca mới trùng ca cũ');
-        const [target]=await tx`SELECT * FROM slots WHERE id=${newSlot} AND env=${old.env} FOR UPDATE`;
-        if(!target || target.committee_id!==old.committee_id)throw httpError('Chỉ hỗ trợ chuyển sang ca khác trong cùng ban');
-        if(!target.open)throw httpError('Ca đích đang đóng');
+        if(old.slot_id===newSlot)throw httpError('Phiên mới trùng phiên cũ');
+        const [target]=await tx`SELECT s.*,c.subteams FROM slots s JOIN committees c ON c.id=s.committee_id WHERE s.id=${newSlot} AND s.env=${old.env} FOR UPDATE OF s`;
+        if(!target || target.committee_id!==old.committee_id)throw httpError('Chỉ hỗ trợ chuyển sang phiên khác trong cùng ban');
+        // The subteam may change together with the session; a session reserved for one subteam only takes that subteam.
+        const subteam=b.subteam?bookingSubteam(target.subteams,b.subteam,target.subteam):old.subteam;
+        if(target.subteam&&target.subteam!==subteam)throw httpError(`Phiên đích chỉ dành cho ${target.subteam}. Chọn nhóm ${target.subteam} hoặc một phiên dùng chung.`);
+        if(!target.open)throw httpError('Phiên đích đang đóng');
         const [cap]=await tx`SELECT count(*)::int AS n FROM registrations WHERE slot_id=${newSlot}`;
-        if(cap.n>=target.capacity)throw httpError('Ca đích đã hết chỗ');
+        if(cap.n>=target.capacity)throw httpError('Phiên đích đã hết chỗ');
         const conflicts=await tx`
           SELECT s.start_at FROM registrations r JOIN slots s ON s.id=r.slot_id
           WHERE r.env=${old.env} AND r.student_id=${old.student_id} AND r.id<>${id}`;
         if(conflicts.some(x=>!enoughGap(x.start_at,target.start_at)))
-          throw httpError('Ca đích: '+GAP_MESSAGE);
+          throw httpError('Phiên đích: '+GAP_MESSAGE);
         // Keep original lookup_hash to preserve student's device confirmation link.
-        await tx`UPDATE registrations SET slot_id=${newSlot} WHERE id=${id}`;
-        await audit(tx,action,{registration_id:id,to_slot:newSlot});
+        await tx`UPDATE registrations SET slot_id=${newSlot},subteam=${subteam} WHERE id=${id}`;
+        await audit(tx,action,{registration_id:id,to_slot:newSlot,subteam});
+      });
+    }else if(action==='set_subteam'){
+      const id=intClean(b.registration_id);
+      await sql.begin(async tx=>{
+        const [r]=await tx`
+          SELECT r.id,r.subteam AS old,s.subteam AS slot_subteam,c.subteams FROM registrations r
+          JOIN slots s ON s.id=r.slot_id JOIN committees c ON c.id=r.committee_id WHERE r.id=${id} FOR UPDATE OF r`;
+        if(!r)throw httpError('Không tìm thấy đăng ký');
+        if(!r.subteams.length)throw httpError('Ban này không chia nhóm');
+        const subteam=bookingSubteam(r.subteams,b.subteam,r.slot_subteam);
+        await tx`UPDATE registrations SET subteam=${subteam} WHERE id=${id}`;
+        await audit(tx,action,{registration_id:id,from:r.old,to:subteam});
       });
     }else throw httpError('Hành động quản trị không hợp lệ');
     res.status(200).json({ok:true});

@@ -10,7 +10,7 @@ export default async function handler(req,res){
     const hashes=tokens.map(t=>crypto.createHash('sha256').update(t).digest('hex'));
     const sql=db();
     const result=await sql`
-      SELECT r.id,r.student_name,r.student_id,r.env,r.created_at,c.name AS committee_name,s.start_at
+      SELECT r.id,r.student_name,r.student_id,r.env,r.created_at,r.subteam,c.name AS committee_name,s.start_at,s.room
       FROM registrations r JOIN committees c ON c.id=r.committee_id JOIN slots s ON s.id=r.slot_id
       WHERE r.lookup_hash IN ${sql(hashes)} ORDER BY s.start_at`;
     res.status(200).json({registrations:result});

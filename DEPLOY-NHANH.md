@@ -2,7 +2,7 @@
 
 **Đầu vào:** file ZIP này. **Đầu ra:** 1 URL Vercel để sinh viên đăng ký, 1 trang /admin để BTC quản lý.
 
-1. **Supabase:** tạo project → SQL Editor → chạy `sql/schema.sql`. Sao chép **Connection string Transaction pooler**. Nếu database đã có từ trước, chạy thêm `sql/migrate-002-mssv-lock.sql` trước khi deploy.
+1. **Supabase:** tạo project → SQL Editor → chạy `sql/schema.sql`. Sao chép **Connection string Transaction pooler**. Nếu database đã có từ trước, chạy thêm `sql/migrate-002-mssv-lock.sql` rồi `sql/migrate-003-room-subteam.sql` trước khi deploy.
 2. **GitHub:** tạo repository **Private**, upload toàn bộ file bên trong thư mục gốc của dự án (không upload dữ liệu cá nhân).
 3. **Vercel:** Import repository từ https://vercel.com/new; framework `Other`, root directory chứa `package.json`.
 4. **Biến môi trường Vercel:** điền `DATABASE_URL`, `ADMIN_PASSWORD` (>=16 ký tự), `AUTH_SECRET` (>=32 ký tự). Tạo chuỗi bí mật bằng `openssl rand -hex 32`.

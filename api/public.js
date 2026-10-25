@@ -8,9 +8,9 @@ export default async function handler(req,res){
     const [row]=await sql`SELECT active_env,registration_open,registration_opens_at,registration_closes_at,notice FROM app_settings WHERE singleton=true`;
     if(!row)throw new Error('Chưa khởi tạo database');
     const w=registrationWindow(row), settings={...row,registration_open:w.open,registration_state:w.reason};
-    const committees=await sql`SELECT id,name FROM committees ORDER BY id`;
+    const committees=await sql`SELECT id,name,subteams FROM committees ORDER BY id`;
     const slots=await sql`
-      SELECT s.id,s.committee_id,s.start_at,s.capacity,s.open,COUNT(r.id)::int AS registered
+      SELECT s.id,s.committee_id,s.start_at,s.room,s.subteam,s.capacity,s.open,COUNT(r.id)::int AS registered
       FROM slots s LEFT JOIN registrations r ON r.slot_id=s.id
       WHERE s.env=${settings.active_env}
       GROUP BY s.id ORDER BY s.start_at,s.committee_id`;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nameClean,idClean,envClean,intClean,startClean,enoughGap,csvCell,slotIdsClean} from '../lib/validation.js';
+import {nameClean,idClean,envClean,intClean,startClean,enoughGap,csvCell,slotIdsClean,roomClean,subteamListClean,bookingSubteam} from '../lib/validation.js';
 test('student validation',()=>{
  assert.equal(nameClean(' Hồ   Văn A '),'Hồ Văn A');
  assert.equal(idClean(' se123456 '),'SE123456');
@@ -38,10 +38,24 @@ test('registration window',async()=>{
  assert.equal(registrationWindow({registration_open:true,registration_opens_at:'2026-10-27T07:00:00+07:00',registration_closes_at:'2026-10-27T09:00:00+07:00'},now).open,true);
 });
 test('submission must include a slot',()=>{
- assert.throws(()=>slotIdsClean({}),/chọn ít nhất một ca/);
- assert.throws(()=>slotIdsClean({slot_ids:[]}),/chọn ít nhất một ca/);
+ assert.throws(()=>slotIdsClean({}),/chọn ít nhất một phiên/);
+ assert.throws(()=>slotIdsClean({slot_ids:[]}),/chọn ít nhất một phiên/);
  assert.throws(()=>slotIdsClean({slot_ids:['x']}),/không hợp lệ/);
  assert.deepEqual(slotIdsClean({slot_ids:[3,3,'5']}),[3,5]);
  assert.deepEqual(slotIdsClean({slot_id:7}),[7]);
  assert.throws(()=>slotIdsClean({slot_ids:[1,2,3,4,5,6,7,8,9,10,11]}),/tối đa 10/);
+});
+test('room and subteam validation',()=>{
+ assert.equal(roomClean('  A.203  '),'A.203');
+ assert.equal(roomClean(undefined),'');
+ assert.throws(()=>roomClean('x'.repeat(51)),/Số phòng/);
+ assert.deepEqual(subteamListClean(' Creative Team, Product Team ,,Digital Team, Creative Team'),['Creative Team','Product Team','Digital Team']);
+ assert.deepEqual(subteamListClean(''),[]);
+ const teams=['Creative Team','Product Team','Digital Team'];
+ assert.equal(bookingSubteam([], 'Creative Team'),'');          // committee without subteams ignores the field
+ assert.equal(bookingSubteam(teams,'Product Team'),'Product Team');
+ assert.throws(()=>bookingSubteam(teams,''),/chọn một nhóm/);
+ assert.throws(()=>bookingSubteam(teams,'Design Team'),/Nhóm không hợp lệ/);
+ assert.equal(bookingSubteam(teams,'Digital Team','Digital Team'),'Digital Team');
+ assert.throws(()=>bookingSubteam(teams,'Creative Team','Digital Team'),/chỉ dành cho Digital Team/);
 });

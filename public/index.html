@@ -15,6 +15,12 @@
 </div></header>
 
 <main class="container">
+  <section id="notice" class="notice" aria-labelledby="notice-title">
+    <div class="notice-head"><span class="notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span><h2 id="notice-title">Thông báo từ Ban tổ chức</h2></div>
+    <p id="notice-text" class="notice-text" role="status">Đang tải thông báo từ Ban tổ chức…</p>
+    <p id="notice-window" class="notice-window" hidden></p>
+  </section>
+
   <section class="hero hero-photo">
     <div class="hero-text">
       <div class="eyebrow">Chương trình Đại sứ sinh viên • FPTU HCM</div>
@@ -26,15 +32,13 @@
     <img class="hero-img" src="/hero-team.jpg" alt="Đội ngũ Đại sứ sinh viên FPTU HCM tại gian hàng Trường Đại học FPT">
   </section>
 
-  <div id="notice" class="notice" role="status"><span class="notice-icon" aria-hidden="true"></span><span id="notice-text">Đang tải thông báo từ Ban tổ chức…</span></div>
-
   <div id="booking" class="layout">
     <section id="form-panel" class="panel form-panel">
       <header class="panel-header">
         <div class="panel-title"><span class="step-num" aria-hidden="true">1</span><div><h2>Thông tin đăng ký</h2><p>Mỗi MSSV chỉ được gửi đăng ký một lần. Kiểm tra kỹ trước khi gửi.</p></div></div>
       </header>
       <form id="registration-form" class="form">
-        <div id="summary" class="summary"><div class="label">Các ca đã chọn</div><div id="selected-slot">Chưa chọn ca. Chọn một ca còn chỗ ở mỗi ban bạn muốn ứng tuyển (bước 2).</div></div>
+        <div id="summary" class="summary"><div class="label">Các phiên đã chọn</div><div id="selected-slot">Chưa chọn phiên. Chọn một phiên còn chỗ ở mỗi ban bạn muốn ứng tuyển (bước 2).</div></div>
         <div class="field"><label for="full-name">Họ và tên <span class="required">*</span></label><input id="full-name" maxlength="100" autocomplete="name" required placeholder="Nguyễn Văn A"></div>
         <div class="field"><label for="student-id">Mã số sinh viên (MSSV) <span class="required">*</span></label><input id="student-id" maxlength="8" required placeholder="SE123456" spellcheck="false" autocapitalize="characters" pattern="[A-Za-z]{2}[0-9]{6}" title="2 chữ cái và 6 chữ số, ví dụ SE170001" aria-describedby="student-id-hint"><div id="student-id-hint" class="field-hint">2 chữ cái + 6 chữ số, đúng như trên thẻ sinh viên (ví dụ SE170001).</div></div>
         <button class="btn primary wide" id="submit-btn" type="submit" disabled><span id="submit-label">Gửi đăng ký</span><span aria-hidden="true">→</span></button>
@@ -50,6 +54,7 @@
       </header>
       <div id="committee-tabs" class="tabs" role="tablist" aria-label="Chọn ban"></div>
       <div class="panel-body">
+        <div id="subteam-pick" class="subteam-pick" hidden></div>
         <p id="slot-alert" class="feedback error slot-alert" role="alert"></p>
         <div id="slots" class="slots" aria-live="polite"><div class="skeleton" aria-label="Đang tải lịch phỏng vấn"><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
         <p id="refresh-info" class="sync">Tự cập nhật mỗi 15 giây</p>

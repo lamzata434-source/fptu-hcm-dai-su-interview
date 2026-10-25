@@ -17,9 +17,9 @@ function mapRow(row){
   const student_name=get(row,'student_name','ho va ten','ho ten','name');
   const student_id=get(row,'student_id','mssv','ma so sinh vien','ma sinh vien');
   const committee=get(row,'committee','ban','ten ban');
-  const start=get(row,'start_at','thoi gian','ca phong van','slot_start','start','bat dau');
-  const d=get(row,'ngay','date'),time=get(row,'gio','time');
-  return {student_name:nameClean(student_name),student_id:idClean(student_id),committee,
+  const start=get(row,'start_at','thoi gian','phien phong van','ca phong van','slot_start','start','bat dau');
+  const d=get(row,'ngay','date'),time=get(row,'gio','time'),subteam=get(row,'subteam','nhom','team');
+  return {student_name:nameClean(student_name),student_id:idClean(student_id),committee,subteam,
     start_at:normalizeDate(start)||normalizeDate(`${d} ${time}`)};
 }
 export default async function handler(req,res){
@@ -40,14 +40,17 @@ export default async function handler(req,res){
       if(line.error){errors.push({row:line.row,error:line.error});continue;}
       try{
         const x=line.data;
-        if(!x.start_at||!x.committee)throw httpError('Thiếu tên ban hoặc thời gian ca');
+        if(!x.start_at||!x.committee)throw httpError('Thiếu tên ban hoặc thời gian phiên');
         const result=await sql.begin(async tx=>{
           const committees=await tx`SELECT id FROM committees WHERE lower(name)=lower(${x.committee})`;
           if(committees.length!==1)throw httpError(`Tên ban chưa có: ${x.committee}`);
           const committee_id=committees[0].id;
-          const slots=await tx`SELECT id FROM slots WHERE env=${env} AND committee_id=${committee_id} AND start_at=${x.start_at}`;
-          if(!slots.length)throw httpError('Chưa có ca tương ứng. Hãy tạo lịch trước khi nhập.');
-          const r=await createRegistration(tx,{...x,slot_id:slots[0].id},env,{skipPast:true,allowClosed:true});
+          const slots=await tx`SELECT id,subteam FROM slots WHERE env=${env} AND committee_id=${committee_id} AND start_at=${x.start_at}`;
+          if(!slots.length)throw httpError('Chưa có phiên tương ứng. Hãy tạo lịch trước khi nhập.');
+          // Subteams of one committee may have sessions at the same time; the subteam column picks one.
+          const slot=slots.find(s=>s.subteam===x.subteam)||(slots.length===1?slots[0]:null);
+          if(!slot)throw httpError('Có nhiều phiên cùng giờ cho các nhóm khác nhau. Thêm cột subteam để chọn đúng phiên.');
+          const r=await createRegistration(tx,{...x,slot_id:slot.id},env,{skipPast:true,allowClosed:true,allowNoSubteam:true});
           await tx`INSERT INTO registration_locks(env,student_id) VALUES(${env},${r.student_id}) ON CONFLICT DO NOTHING`;
           await tx`INSERT INTO admin_audit(action,details) VALUES('import_csv',${JSON.stringify({registration_id:r.id,row:line.row,env})}::jsonb)`;
           return r;

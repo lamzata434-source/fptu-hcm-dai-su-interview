@@ -84,13 +84,13 @@ test('generateSlots reports duplicates and overlaps by name and time', async () 
   const {sql} = fakeSql({committees, slots, settings: openSettings});
   const r = await generateSlots(sql, 'test', body, noAudit);
   assert.equal(r.created, 5);
-  assert.match(r.skipped[0], /1 ca đã có sẵn.*CLB Đại sứ sinh viên 10:30 ngày 27\/10/);
-  assert.match(r.skipped[1], /2 ca chồng giờ.*Đại sứ về Trường 10:45 ngày 27\/10 chồng với ca 10:50/);
+  assert.match(r.skipped[0], /1 phiên đã có sẵn.*CLB Đại sứ sinh viên 10:30 ngày 27\/10/);
+  assert.match(r.skipped[1], /2 phiên chồng giờ.*Đại sứ về Trường 10:45 ngày 27\/10 chồng với phiên 10:50/);
 });
 test('generateSlots fails with details when nothing new can be created', async () => {
   const slots = ['10:30', '10:45', '11:00', '11:15'].flatMap(t => [1, 2].map(c => ({env: 'test', committee_id: c, start_at: `2030-10-27T${t}:00+07:00`})));
   const {sql} = fakeSql({committees, slots, settings: openSettings});
-  await assert.rejects(generateSlots(sql, 'test', body, noAudit), e => /Không có ca mới nào/.test(e.message) && /8 ca đã có sẵn/.test(e.details[0]));
+  await assert.rejects(generateSlots(sql, 'test', body, noAudit), e => /Không có phiên mới nào/.test(e.message) && /8 phiên đã có sẵn/.test(e.details[0]));
 });
 test('generateSlots rejects bad configuration and unknown committees', async () => {
   const {sql} = fakeSql({committees, settings: openSettings});
@@ -102,4 +102,20 @@ test('generateSlots warns when students will not see or cannot book the slots', 
   assert.match((await generateSlots(sql, 'test', body, noAudit)).warnings[0], /sinh viên đang thấy môi trường Chính thức/);
   ({sql} = fakeSql({committees, settings: {active_env: 'test', registration_open: false}}));
   assert.match((await generateSlots(sql, 'test', body, noAudit)).warnings[0], /chưa đăng ký được: BTC chưa mở đăng ký/);
+});
+test('subteams of one committee are separate tracks', () => {
+  const p = planSchedule({committee_ids: [3], from_date: '2030-10-27', to_date: '2030-10-27', start_time: '09:00', end_time: '09:30', capacity: 1}).slots.map(s => ({...s, subteam: 'Product Team'}));
+  const existing = [{committee_id: 3, subteam: 'Creative Team', start_at: '2030-10-27T09:00:00+07:00'}, {committee_id: 3, subteam: 'Product Team', start_at: '2030-10-27T09:15:00+07:00'}];
+  const r = sortOutConflicts(p, existing, Date.parse('2030-01-01'));
+  assert.deepEqual(r.fresh.map(s => s.start_at), ['2030-10-27T09:00:00+07:00']);   // Creative at 09:00 does not block Product
+  assert.equal(r.duplicates.length, 1);
+});
+test('generateSlots sets room and subteam on every session', async () => {
+  const teams = [...committees, {id: 3, name: 'Đại sứ Truyền thông', subteams: ['Creative Team', 'Product Team', 'Digital Team']}];
+  const {sql, inserted} = fakeSql({committees: teams, settings: openSettings});
+  const r = await generateSlots(sql, 'test', {...body, committee_ids: [3], room: ' C.301 ', subteam: 'Creative Team'}, noAudit);
+  assert.equal(r.created, 4);
+  assert.ok(inserted.every(x => x.room === 'C.301' && x.subteam === 'Creative Team'));
+  await assert.rejects(generateSlots(sql, 'test', {...body, committee_ids: [1, 3], subteam: 'Creative Team'}, noAudit), e => /không thuộc CLB Đại sứ sinh viên/.test(e.message));
+  await assert.rejects(generateSlots(sql, 'test', {...body, room: 'x'.repeat(51)}, noAudit), e => e.details.some(d => /Số phòng/.test(d)));
 });

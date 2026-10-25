@@ -9,6 +9,8 @@ export default async function handler(req,res){
     method(req,'POST');sameOrigin(req);const body=jsonBody(req);const sql=db();
     const slotIds=slotIdsClean(body);
     const sid=idClean(body.student_id);
+    // committee_id -> chosen subteam, for committees that have subteams.
+    const subteams=body.subteams&&typeof body.subteams==='object'&&!Array.isArray(body.subteams)?body.subteams:{};
     const result=await sql.begin(async tx=>{
       const [settings]=await tx`SELECT active_env,registration_open,registration_opens_at,registration_closes_at FROM app_settings WHERE singleton=true FOR SHARE`;
       const w=registrationWindow(settings);
@@ -21,12 +23,12 @@ export default async function handler(req,res){
       const chosen=await tx`
         SELECT s.id,s.committee_id,s.start_at,c.name FROM slots s JOIN committees c ON c.id=s.committee_id
         WHERE s.env=${env} AND s.id IN ${tx(slotIds)} ORDER BY s.start_at`;
-      if(chosen.length!==slotIds.length)throw httpError('Không tìm thấy ca phỏng vấn',404);
-      if(new Set(chosen.map(s=>s.committee_id)).size!==chosen.length)throw httpError('Mỗi ban chỉ được chọn một ca');
+      if(chosen.length!==slotIds.length)throw httpError('Không tìm thấy phiên phỏng vấn',404);
+      if(new Set(chosen.map(s=>s.committee_id)).size!==chosen.length)throw httpError('Mỗi ban chỉ được chọn một phiên');
       const registrations=[];
       for(const s of chosen){
         // All-or-nothing: any failing slot rolls back the whole submission.
-        try{registrations.push(await createRegistration(tx,{...body,student_id:sid,slot_id:s.id},env));}
+        try{registrations.push(await createRegistration(tx,{...body,student_id:sid,slot_id:s.id,subteam:subteams[s.committee_id]},env));}
         catch(e){if(!e.gap)e.message=`${s.name} (${slotLabel(s.start_at)}): ${e.message}`;throw e;}
       }
       await tx`INSERT INTO registration_locks(env,student_id) VALUES(${env},${sid})`;
